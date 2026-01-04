@@ -67,9 +67,9 @@ ticker = st.sidebar.text_input("Mã cổ phiếu", value="AAPL", help="Nhập m�
 st.sidebar.subheader("Khoảng thời gian")
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    start_date = st.date_input("Từ ngày", value=pd.to_datetime("2020-01-01"))
+    start_date = st.date_input("Từ ngày", value=pd.to_datetime("2020-01-01"), min_value=pd.to_datetime("1980-01-01"))
 with col2:
-    end_date = st.date_input("Đến ngày", value=pd.to_datetime("2025-12-31"))
+    end_date = st.date_input("Đến ngày", value=pd.to_datetime("2025-12-31"), min_value=pd.to_datetime("1980-01-01"))
 
 # Tham số mô hình
 st.sidebar.subheader("Tham số Random Forest")
