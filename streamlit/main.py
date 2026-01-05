@@ -9,11 +9,9 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 import sys
 import os
 
-# Thêm path để import model
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from model.RandomForest import RandomForest
 
-# Cấu hình trang
 st.set_page_config(
     page_title="Dự Báo Giá Cổ Phiếu - Random Forest",
     page_icon="📈",
@@ -21,7 +19,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS tùy chỉnh
 st.markdown("""
 <style>
     .main-header {
@@ -57,13 +54,12 @@ st.markdown("""
 # Header
 st.markdown('<p class="main-header">Dự Báo Giá Cổ Phiếu với Random Forest</p>', unsafe_allow_html=True)
 
-# Sidebar - Cấu hình
+# Sidebar
 st.sidebar.header("Cấu hình Mô hình")
 
-# Chọn cổ phiếu
-ticker = st.sidebar.text_input("Mã cổ phiếu", value="AAPL", help="Nhập mã cổ phiếu (VD: AAPL, GOOGL, MSFT, TSLA)")
+ticker = st.sidebar.text_input("Mã cổ phiếu", value="HON", help="Nhập mã cổ phiếu (VD: AAPL, GOOGL, MSFT, TSLA)")
 
-# Chọn khoảng thời gian
+# Time
 st.sidebar.subheader("Khoảng thời gian")
 col1, col2 = st.sidebar.columns(2)
 with col1:
@@ -78,7 +74,7 @@ max_depth = st.sidebar.slider("Độ sâu tối đa (max_depth)", min_value=3, m
 min_samples_split = st.sidebar.slider("Min samples split", min_value=2, max_value=20, value=5)
 train_ratio = st.sidebar.slider("Tỷ lệ Train (%)", min_value=70, max_value=90, value=85)
 
-# Chọn đặc trưng
+# Selected features
 st.sidebar.subheader("Chọn Đặc trưng")
 all_features = [
     'Close', 'log_return', 'sp500_return', 'vix_change', 'open_close_change',
