@@ -9,9 +9,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 import sys
 import os
 
+# Thêm path để import model
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from model.RandomForest import RandomForest
 
+# Cấu hình trang
 st.set_page_config(
     page_title="Dự Báo Giá Cổ Phiếu - Random Forest",
     page_icon="📈",
@@ -19,6 +21,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# CSS tùy chỉnh
 st.markdown("""
 <style>
     .main-header {
@@ -53,19 +56,21 @@ st.markdown("""
 
 # Header
 st.markdown('<p class="main-header">Dự Báo Giá Cổ Phiếu với Random Forest</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Môn học: Machine Learning | Mô hình: Random Forest Regression</p>', unsafe_allow_html=True)
 
-# Sidebar
+# Sidebar - Cấu hình
 st.sidebar.header("Cấu hình Mô hình")
 
-ticker = st.sidebar.text_input("Mã cổ phiếu", value="HON", help="Nhập mã cổ phiếu (VD: AAPL, GOOGL, MSFT, TSLA)")
+# Chọn cổ phiếu
+ticker = st.sidebar.text_input("Mã cổ phiếu", value="AAPL", help="Nhập mã cổ phiếu (VD: AAPL, GOOGL, MSFT, TSLA)")
 
-# Time
+# Chọn khoảng thời gian
 st.sidebar.subheader("Khoảng thời gian")
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    start_date = st.date_input("Từ ngày", value=pd.to_datetime("2020-01-01"), min_value=pd.to_datetime("1980-01-01"))
+    start_date = st.date_input("Từ ngày", value=pd.to_datetime("2020-01-01"))
 with col2:
-    end_date = st.date_input("Đến ngày", value=pd.to_datetime("2025-12-31"), min_value=pd.to_datetime("1980-01-01"))
+    end_date = st.date_input("Đến ngày", value=pd.to_datetime("2025-12-31"))
 
 # Tham số mô hình
 st.sidebar.subheader("Tham số Random Forest")
@@ -74,19 +79,33 @@ max_depth = st.sidebar.slider("Độ sâu tối đa (max_depth)", min_value=3, m
 min_samples_split = st.sidebar.slider("Min samples split", min_value=2, max_value=20, value=5)
 train_ratio = st.sidebar.slider("Tỷ lệ Train (%)", min_value=70, max_value=90, value=85)
 
-# Selected features
+# Chọn đặc trưng
 st.sidebar.subheader("Chọn Đặc trưng")
-all_features = [
-    'Close', 'log_return', 'sp500_return', 'vix_change', 'open_close_change',
-    'obv', 'ma_5', 'ma_10', 'volatility_5', 'rsi_14', 'macd', 'stoch_k',
-    'atr_14', 'bb_width', 'cci', 'adx'
-]
+all_features = {
+    'Close': 'Giá đóng cửa',
+    'log_return': 'Log Return',
+    'sp500_return': 'S&P 500 Return',
+    'vix_change': 'VIX Change',
+    'open_close_change': 'Open-Close Change',
+    'obv': 'On Balance Volume',
+    'ma_5': 'MA 5 ngày',
+    'ma_10': 'MA 10 ngày',
+    'volatility_5': 'Volatility 5 ngày',
+    'rsi_14': 'RSI (14)',
+    'macd': 'MACD',
+    'stoch_k': 'Stochastic %K',
+    'atr_14': 'ATR (14)',
+    'bb_width': 'Bollinger Band Width',
+    'cci': 'CCI',
+    'adx': 'ADX'
+}
 
 default_features = ['Close', 'log_return', 'sp500_return', 'vix_change', 'open_close_change', 'obv', 'ma_5', 'volatility_5']
 selected_features = st.sidebar.multiselect(
     "Chọn các đặc trưng để huấn luyện",
-    options=all_features,
-    default=default_features
+    options=list(all_features.keys()),
+    default=default_features,
+    format_func=lambda x: all_features[x]
 )
 
 # Nút huấn luyện
@@ -248,6 +267,22 @@ def train_model(df, n_trees, max_depth, min_samples_split, train_ratio, selected
     true_direction = np.sign(y_test)
     directional_acc = np.mean(pred_direction == true_direction) * 100
 
+    # Dự đoán cho ngày tiếp theo (tương lai)
+    # Lấy dữ liệu của ngày cuối cùng để dự đoán ngày tiếp theo
+    last_row_features = df[available_features].iloc[-1].values.reshape(1, -1)
+    future_log_return = rf.predict(last_row_features)[0]
+    last_close_price = df['Close'].iloc[-1]
+    future_price = last_close_price * np.exp(future_log_return)
+
+    # Tính ngày tiếp theo (bỏ qua cuối tuần)
+    last_date = df.index[-1]
+    next_date = last_date + pd.Timedelta(days=1)
+    # Nếu là thứ 7 -> +2, Chủ nhật -> +1
+    if next_date.weekday() == 5:  # Thứ 7
+        next_date = next_date + pd.Timedelta(days=2)
+    elif next_date.weekday() == 6:  # Chủ nhật
+        next_date = next_date + pd.Timedelta(days=1)
+
     return {
         'model': rf,
         'y_test': y_test,
@@ -260,7 +295,10 @@ def train_model(df, n_trees, max_depth, min_samples_split, train_ratio, selected
         'mae': mae,
         'directional_acc': directional_acc,
         'split_idx': split_idx,
-        'features': available_features
+        'features': available_features,
+        'future_date': next_date,
+        'future_price': future_price,
+        'last_close_price': last_close_price
     }
 
 # Tabs chính
@@ -350,7 +388,7 @@ with tab2:
             results = st.session_state['results']
 
             st.success("Huấn luyện hoàn tất!")
-
+            
             # Hiển thị đặc trưng đã sử dụng
             st.info(f"Đặc trưng sử dụng: {', '.join(results['features'])}")
 
@@ -366,6 +404,19 @@ with tab2:
                 st.metric("MAE", f"{results['mae']:.4f}", help="Mean Absolute Error")
             with col4:
                 st.metric("Độ chính xác xu hướng", f"{results['directional_acc']:.2f}%", help="Directional Accuracy")
+
+            # Hiển thị dự đoán ngày tiếp theo
+            st.subheader("Dự đoán Ngày Tiếp Theo")
+            future_col1, future_col2, future_col3 = st.columns(3)
+            with future_col1:
+                st.metric("Ngày dự đoán", results['future_date'].strftime('%d/%m/%Y'))
+            with future_col2:
+                st.metric("Giá dự đoán", f"${results['future_price']:.2f}")
+            with future_col3:
+                change_pct = ((results['future_price'] - results['last_close_price']) / results['last_close_price']) * 100
+                change_direction = "+" if change_pct > 0 else ""
+                st.metric("Thay đổi dự kiến", f"{change_direction}{change_pct:.2f}%",
+                         delta=f"${results['future_price'] - results['last_close_price']:.2f}")
 
             # Biểu đồ chính - So sánh giá
             st.subheader("Biểu đồ So sánh Giá Thực tế vs Dự báo")
@@ -384,6 +435,30 @@ with tab2:
                 name='Giá Dự báo',
                 line=dict(color='#ff7f0e', width=2, dash='dash')
             ))
+
+            # Thêm đường nối từ điểm cuối đến điểm dự đoán tương lai
+            last_test_date = results['dates_test'][-1]
+            last_predicted_price = results['predicted_prices'][-1]
+            fig1.add_trace(go.Scatter(
+                x=[last_test_date, results['future_date']],
+                y=[last_predicted_price, results['future_price']],
+                mode='lines',
+                name='Dự báo Tương lai',
+                line=dict(color='#e74c3c', width=2, dash='dot'),
+                showlegend=True
+            ))
+
+            # Thêm điểm dự đoán tương lai với màu đỏ nổi bật
+            fig1.add_trace(go.Scatter(
+                x=[results['future_date']],
+                y=[results['future_price']],
+                mode='markers',
+                name=f'Dự báo {results["future_date"].strftime("%d/%m/%Y")}',
+                marker=dict(color='#e74c3c', size=15, symbol='star',
+                           line=dict(color='white', width=2)),
+                hovertemplate=f'<b>Dự báo Tương lai</b><br>Ngày: {results["future_date"].strftime("%d/%m/%Y")}<br>Giá: ${results["future_price"]:.2f}<extra></extra>'
+            ))
+
             fig1.update_layout(
                 title=f'Dự báo Giá Cổ Phiếu {st.session_state.get("ticker", ticker)} - Random Forest (MAPE: {results["mape"]:.2f}%)',
                 xaxis_title='Thời gian',
@@ -609,8 +684,132 @@ with tab3:
 
         st.plotly_chart(fig_main, use_container_width=True)
 
+        # Thêm các chỉ báo khác
+        st.subheader("Các Chỉ báo Kỹ thuật Khác")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Stochastic Oscillator
+            fig_stoch = go.Figure()
+            fig_stoch.add_trace(go.Scatter(
+                x=df.index, y=df['stoch_k'],
+                mode='lines',
+                name='%K',
+                line=dict(color='blue', width=1)
+            ))
+            fig_stoch.add_trace(go.Scatter(
+                x=df.index, y=df['stoch_d'],
+                mode='lines',
+                name='%D',
+                line=dict(color='orange', width=1)
+            ))
+            fig_stoch.add_hline(y=80, line_dash="dash", line_color="red")
+            fig_stoch.add_hline(y=20, line_dash="dash", line_color="green")
+            fig_stoch.update_layout(
+                title='Stochastic Oscillator',
+                xaxis_title='Thời gian',
+                yaxis_title='%',
+                template='plotly_white',
+                height=300
+            )
+            st.plotly_chart(fig_stoch, use_container_width=True)
+
+        with col2:
+            # Williams %R
+            fig_williams = go.Figure()
+            fig_williams.add_trace(go.Scatter(
+                x=df.index, y=df['williams_r'],
+                mode='lines',
+                name='Williams %R',
+                line=dict(color='purple', width=1)
+            ))
+            fig_williams.add_hline(y=-20, line_dash="dash", line_color="red")
+            fig_williams.add_hline(y=-80, line_dash="dash", line_color="green")
+            fig_williams.update_layout(
+                title='Williams %R',
+                xaxis_title='Thời gian',
+                yaxis_title='%',
+                template='plotly_white',
+                height=300
+            )
+            st.plotly_chart(fig_williams, use_container_width=True)
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            # ADX
+            fig_adx = go.Figure()
+            fig_adx.add_trace(go.Scatter(
+                x=df.index, y=df['adx'],
+                mode='lines',
+                name='ADX',
+                line=dict(color='black', width=2)
+            ))
+            fig_adx.add_trace(go.Scatter(
+                x=df.index, y=df['plus_di'],
+                mode='lines',
+                name='+DI',
+                line=dict(color='green', width=1)
+            ))
+            fig_adx.add_trace(go.Scatter(
+                x=df.index, y=df['minus_di'],
+                mode='lines',
+                name='-DI',
+                line=dict(color='red', width=1)
+            ))
+            fig_adx.add_hline(y=25, line_dash="dash", line_color="gray")
+            fig_adx.update_layout(
+                title='ADX (Average Directional Index)',
+                xaxis_title='Thời gian',
+                yaxis_title='Giá trị',
+                template='plotly_white',
+                height=300
+            )
+            st.plotly_chart(fig_adx, use_container_width=True)
+
+        with col4:
+            # CCI
+            fig_cci = go.Figure()
+            fig_cci.add_trace(go.Scatter(
+                x=df.index, y=df['cci'],
+                mode='lines',
+                name='CCI',
+                line=dict(color='teal', width=1)
+            ))
+            fig_cci.add_hline(y=100, line_dash="dash", line_color="red")
+            fig_cci.add_hline(y=-100, line_dash="dash", line_color="green")
+            fig_cci.add_hline(y=0, line_dash="solid", line_color="gray")
+            fig_cci.update_layout(
+                title='CCI (Commodity Channel Index)',
+                xaxis_title='Thời gian',
+                yaxis_title='Giá trị',
+                template='plotly_white',
+                height=300
+            )
+            st.plotly_chart(fig_cci, use_container_width=True)
+
+        # ATR
+        fig_atr = go.Figure()
+        fig_atr.add_trace(go.Scatter(
+            x=df.index, y=df['atr_14'],
+            mode='lines',
+            name='ATR (14)',
+            line=dict(color='orange', width=1.5),
+            fill='tozeroy',
+            fillcolor='rgba(255, 165, 0, 0.2)'
+        ))
+        fig_atr.update_layout(
+            title='ATR (Average True Range) - Đo lường Biến động',
+            xaxis_title='Thời gian',
+            yaxis_title='ATR',
+            template='plotly_white',
+            height=300
+        )
+        st.plotly_chart(fig_atr, use_container_width=True)
+
         # Bảng tóm tắt chỉ báo
-        st.subheader("Tóm tắt Chỉ báo Kỹ thuật")
+        st.subheader("Tóm tắt Chỉ báo Kỹ thuật (Giá trị hiện tại)")
 
         latest = df.iloc[-1]
 
@@ -630,18 +829,22 @@ with tab3:
 
         col5, col6, col7, col8 = st.columns(4)
         with col5:
-            st.metric("ATR (14)", f"${latest['atr_14']:.2f}", "Biến động")
+            williams_status = "Quá mua" if latest['williams_r'] > -20 else ("Quá bán" if latest['williams_r'] < -80 else "Trung tính")
+            st.metric("Williams %R", f"{latest['williams_r']:.2f}", williams_status)
         with col6:
             cci_status = "Quá mua" if latest['cci'] > 100 else ("Quá bán" if latest['cci'] < -100 else "Trung tính")
             st.metric("CCI", f"{latest['cci']:.2f}", cci_status)
         with col7:
+            st.metric("ATR (14)", f"${latest['atr_14']:.2f}", "Biến động")
+        with col8:
             bb_pos = (latest['Close'] - latest['bb_lower']) / (latest['bb_upper'] - latest['bb_lower']) * 100
             bb_status = "Gần BB Upper" if bb_pos > 80 else ("Gần BB Lower" if bb_pos < 20 else "Giữa BB")
             st.metric("BB Position", f"{bb_pos:.1f}%", bb_status)
-        with col8:
-            williams_status = "Quá mua" if latest['williams_r'] > -20 else ("Quá bán" if latest['williams_r'] < -80 else "Trung tính")
-            st.metric("Williams %R", f"{latest['williams_r']:.2f}", williams_status)
 
 # Footer
 st.markdown("---")
-
+st.markdown("""
+<div style='text-align: center; color: #666;'>
+    <p>Machine Learning Project | Random Forest Stock Price Prediction</p>
+</div>
+""", unsafe_allow_html=True)
